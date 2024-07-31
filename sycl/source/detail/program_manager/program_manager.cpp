@@ -229,7 +229,10 @@ ProgramManager::createURProgram(const RTDeviceBinaryImage &Img,
   {
     std::lock_guard<std::mutex> Lock(MNativeProgramsMutex);
     // associate the UR program with the image it was created for
-    NativePrograms.insert({Res, &Img});
+    // Note that the key may already exist in the map - this can happen if UR
+    // happens to reuse the same pointer as one that was released prior -
+    // Don't change this to `NativePrograms.insert`.
+    NativePrograms[Res] = &Img;
   }
 
   Ctx->addDeviceGlobalInitializer(Res, {Device}, &Img);
@@ -842,9 +845,12 @@ ur_program_handle_t ProgramManager::getBuiltURProgram(
 
     {
       std::lock_guard<std::mutex> Lock(MNativeProgramsMutex);
-      NativePrograms.insert({BuiltProgram.get(), &Img});
+      // Note that the key may already exist in the map - this can happen if UR
+      // happens to reuse the same pointer as one that was released prior -
+      // Don't change this to `NativePrograms.insert`.
+      NativePrograms[BuiltProgram.get()] = &Img;
       for (RTDeviceBinaryImage *LinkedImg : DeviceImagesToLink) {
-        NativePrograms.insert({BuiltProgram.get(), LinkedImg});
+        NativePrograms[BuiltProgram.get()] = LinkedImg;
       }
     }
 
@@ -2507,7 +2513,10 @@ device_image_plain ProgramManager::build(const device_image_plain &DeviceImage,
 
     {
       std::lock_guard<std::mutex> Lock(MNativeProgramsMutex);
-      NativePrograms.insert({BuiltProgram.get(), &Img});
+      // Note that the key may already exist in the map - this can happen if UR
+      // happens to reuse the same pointer as one that was released prior -
+      // Don't change this to `NativePrograms.insert`.
+      NativePrograms[BuiltProgram.get()] = &Img;
     }
 
     ContextImpl->addDeviceGlobalInitializer(BuiltProgram.get(), Devs, &Img);
